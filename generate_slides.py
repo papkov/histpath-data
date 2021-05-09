@@ -147,7 +147,7 @@ def create_tiles_with_annotation(
     # Save annotated images.
     if save_images:
         if image_dir == "":
-            image_dir = "images/"
+            image_dir = "images" + os.path.sep
 
         if image_dir[-1] != os.path.sep:
             image_dir = image_dir + os.path.sep
