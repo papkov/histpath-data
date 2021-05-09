@@ -1,9 +1,12 @@
-import glob
-import os
-import json
 import argparse
-from openslide import OpenSlide
+import glob
+import json
+import os
+
 import pandas as pd
+from openslide import OpenSlide
+
+from ann_to_coco import *
 
 
 def load_mrxs_files(data_dir):
@@ -58,7 +61,7 @@ def save_annotated_image(image_dir, slide, top_left, size):
     filename = slide._filename.split("/")[-1].split(".")[0]
     im = slide.read_region(location=top_left, level=0, size=(size, size))
     im.save(
-        "{}_{}_{}".format(image_dir + filename, top_left[0], top_left[1]), "PNG",
+        "{}_{}_{}.png".format(image_dir + filename, top_left[0], top_left[1]), "PNG",
     )
 
 
@@ -173,6 +176,7 @@ def main(args):
     print("Data folder: {}".format(root))
     print("All slides: {}".format(mrx_files))
 
+    total_annotations = []
     for slide, annotation in zip(slides, annotations):
         print("Slide: {}".format(slide._filename))
         annotations = create_tiles_with_annotation(
@@ -183,8 +187,13 @@ def main(args):
             image_dir=args.image_dir,
         )
 
+        total_annotations.extend(annotations)
         show_tiles_statistics(annotations)
         print()
+
+    coco = create_COCO_annotations(total_annotations)
+    with open("coco_annotations.json", "w") as f:
+        json.dump(coco, f)
 
 
 if __name__ == "__main__":
