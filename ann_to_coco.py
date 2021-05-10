@@ -6,6 +6,9 @@ import numpy as np
 
 
 def label_to_category_id(label):
+    """
+    Returns an ID from arbitrary label.
+    """
     return {
         "label_color 1": 1,
         "label_color 2": 2,
@@ -16,6 +19,9 @@ def label_to_category_id(label):
 
 
 def get_annotation_label(annotation):
+    """
+    Parses and returns actual label from annotation.
+    """
     available_keys = [
         "label_color 1",
         "label_color 2",
@@ -33,10 +39,22 @@ def get_annotation_label(annotation):
 
 
 def get_annotation_area(annotation):
+    """
+    Returns area under the ellipse.
+    """
     return annotation["stats"]["area_px"]
 
 
 def calculate_bbox(annotation, top_left):
+    """
+    Calculates bbox [x, y, width, height] of annotated section relative to the image.
+
+    ---
+    annotation : array
+        Single annotation element.
+    top_left : tuple(x,y)
+        Top left pixel of annotated image relative to the WSI.
+    """
     ann_points = annotation["geometry"]["points"]
     x1, y1 = ann_points[0][0], ann_points[0][1]
     x2, y2 = ann_points[1][0], ann_points[1][1]
@@ -56,12 +74,18 @@ def calculate_bbox(annotation, top_left):
 
 
 def get_annotation_filename(annotation):
+    """
+    Returns filename of the image where annotation is made.
+    """
     return "{}_{}_{}.png".format(
         annotation["filename"], annotation["top_left"][0], annotation["top_left"][1]
     )
 
 
 def ellipse_to_polygon(bbox):
+    """
+    Converts bbox around ellipse to points as polygon.
+    """
     # Top left pixel.
     x = bbox[0]
     y = bbox[1]
@@ -92,6 +116,9 @@ def ellipse_to_polygon(bbox):
 
 
 def create_COCO_annotations(tiles_with_annotation):
+    """
+    Creates COCO annotation from annotated tiles.
+    """
     df = pd.DataFrame(tiles_with_annotation)
     coco = {}
 
