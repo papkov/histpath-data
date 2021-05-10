@@ -36,6 +36,13 @@ def filter_annotations(annotations, images):
 
 
 def main(args):
+    # Create dirs if not exist.
+    if not os.path.isdir("coco"):
+        os.mkdir("coco")
+        os.mkdir("coco/annotations")
+        os.mkdir("coco/train2017")
+        os.mkdir("coco/val2017")
+
     with open(args.annotations, "rt") as annotations:
         coco = json.load(annotations)
         info = coco["info"]
