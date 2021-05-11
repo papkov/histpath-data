@@ -89,6 +89,44 @@ def show_tiles_statistics(annotated_tiles):
     print("Max annotations: \t{}".format(max_annotations_in_image))
 
 
+def ann_in_image(img_top_left, img_bot_right, ann_top_left, ann_bot_right):
+    """
+    Determines if annotation is fully on an image.
+
+    ---
+    img_top_left: tuple(x,y)
+        Top left point coordinates on WSI image.
+    img_bot_right: tuple(x,y)
+        Bottom right point coordinates on WSI image.
+    ann_top_left: tuple(x,y)
+        Top left coordinates of annotation on WSI image.
+    ann_bot_right: tuple()
+        Bottom right coordinates of annotation on WSI image.
+    """
+    x1 = img_top_left[0]
+    y1 = img_top_left[1]
+
+    x2 = img_bot_right[0]
+    y2 = img_bot_right[1]
+
+    ann_x1 = ann_top_left[0]
+    ann_y1 = ann_top_left[1]
+
+    ann_x2 = ann_bot_right[0]
+    ann_y2 = ann_bot_right[1]
+    # Annotation bbox should be fully on an image.
+    first_point_in_image = ann_x1 > x1 and ann_x1 < x2 and ann_y1 > y1 and ann_y1 < y2
+    second_point_in_image = ann_x2 > x1 and ann_x2 < x2 and ann_y2 > y1 and ann_y2 < y2
+
+    if first_point_in_image and second_point_in_image:
+        return True
+
+    ## TODO: The cut positions should be also iterated if an annotation is cut by the tile
+    ## then it won't appear on any of slides.
+
+    return False
+
+
 def create_tiles_with_annotation(
     annotations, slide, tile_size=1024, image_dir="", save_images=False
 ):
@@ -128,16 +166,13 @@ def create_tiles_with_annotation(
             tile_anns = []
             # Check if there are annotations inside tile.
             for ann in annotations["annotations"]:
-                centres = annotations["annotations"][ann]["geometry"]["points"]
-
-                ann_in_image = False
-                for point in centres:
-                    x_p, y_p = point
-                    # Point inside tile.
-                    if x_p < x_1[0] and x_p > x_0[0] and y_p < x_1[1] and y_p > x_0[1]:
-                        ann_in_image = True
-
-                if ann_in_image:
+                points = annotations["annotations"][ann]["geometry"]["points"]
+                if ann_in_image(
+                    img_top_left=x_0,
+                    img_bot_right=x_1,
+                    ann_top_left=(points[0][0], points[0][1]),
+                    ann_bot_right=(points[1][0], points[1][1]),
+                ):
                     tile_anns.append(annotations["annotations"][ann])
 
             tile_info["top_left"] = x_0
