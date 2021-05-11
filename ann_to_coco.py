@@ -58,17 +58,16 @@ def calculate_bbox(annotation, top_left):
     ann_points = annotation["geometry"]["points"]
     x1, y1 = ann_points[0][0], ann_points[0][1]
     x2, y2 = ann_points[1][0], ann_points[1][1]
+
     # Drawing points are relative to the top left
     # as the new image top left is (0,0)
     point1 = (x1 - top_left[0], y1 - top_left[1])
     point2 = (x2 - top_left[0], y2 - top_left[1])
 
-    # Swap if points are flipped. Point1 should be upper left.
-    if point1 > point2:
-        point1, point2 = point2, point1
-
-    width = point2[0] - point1[0]
-    height = point2[1] - point1[1]
+    # TODO: This may need better handling as the annotation points are sometimes
+    # switched so that the first point isn't top left. Focal points? UI cursor click points?
+    width = abs(point2[0] - point1[0])
+    height = abs(point2[1] - point1[1])
 
     return [point1[0], point1[1], width, height]
 
@@ -158,7 +157,7 @@ def create_COCO_annotations(tiles_with_annotation):
                 "id": ann_id,
                 "image_id": id,
                 "category_id": label_to_category_id(get_annotation_label(ann)),
-                "segmentation": poly,
+                "segmentation": [],
                 "area": get_annotation_area(ann),
                 "bbox": bbox,
                 "iscrowd": 0,
