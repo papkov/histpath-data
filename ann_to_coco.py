@@ -59,6 +59,13 @@ def calculate_bbox(annotation, top_left):
     x1, y1 = ann_points[0][0], ann_points[0][1]
     x2, y2 = ann_points[1][0], ann_points[1][1]
 
+    # Points might be flipped.
+    if x2 < x1:
+        x2, x1 = x1, x2
+
+    if y2 < y1:
+        y2, y1 = y1, y2
+
     # Drawing points are relative to the top left
     # as the new image top left is (0,0)
     point1 = (x1 - top_left[0], y1 - top_left[1])
@@ -66,9 +73,15 @@ def calculate_bbox(annotation, top_left):
 
     # TODO: This may need better handling as the annotation points are sometimes
     # switched so that the first point isn't top left. Focal points? UI cursor click points?
-    width = abs(point2[0] - point1[0])
-    height = abs(point2[1] - point1[1])
+    width = point2[0] - point1[0]
+    height = point2[1] - point1[1]
 
+    if width < 0 or height < 0:
+        raise ValueError(
+            "Annotation bbox width or height cant be negative!\n width:\t{}\n heigh:\t{}\n top-left:\t{}\n annotation:\t{}".format(
+                width, height, top_left, annotation
+            )
+        )
     return [point1[0], point1[1], width, height]
 
 
