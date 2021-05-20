@@ -4,9 +4,9 @@ import json
 import os
 
 import pandas as pd
-from openslide import OpenSlide
+from openslide import OpenSlide, open_slide
 
-from ann_to_coco import *
+from ann_to_coco import create_COCO_annotations
 
 
 def load_mrxs_files(data_dir):
@@ -52,14 +52,14 @@ def save_annotated_image(image_dir, slide, top_left, size):
         Directory where to save images.
     slide : OpenSlide
         OpenSlide object of WSI.
-    top_left : touple
+    top_left : tuple
         Top left coordinates of the image. (x,y)
     size : int
         Size of the generated image
     """
 
     filename = slide._filename.split("/")[-1].split(".")[0]
-    im = slide.read_region(location=top_left, level=0, size=(size, size))
+    im = slide.read_region(location=top_left, level=0, size=(size, size)).convert("RGB")
     im.save(
         "{}_{}_{}.png".format(image_dir + filename, top_left[0], top_left[1]), "PNG",
     )
@@ -89,9 +89,45 @@ def show_tiles_statistics(annotated_tiles):
     print("Max annotations: \t{}".format(max_annotations_in_image))
 
 
-def create_tiles_with_annotation(
-    annotations, slide, tile_size=1024, image_dir="", save_images=False
-):
+def ann_in_image(img_top_left, img_bot_right, ann_top_left, ann_bot_right):
+    """
+    Determines if annotation center is on an image.
+
+    ---
+    img_top_left: tuple(x,y)
+        Top left point coordinates on WSI image.
+    img_bot_right: tuple(x,y)
+        Bottom right point coordinates on WSI image.
+    ann_top_left: tuple(x,y)
+        Top left coordinates of annotation on WSI image.
+    ann_bot_right: tuple()
+        Bottom right coordinates of annotation on WSI image.
+    """
+    x1 = img_top_left[0]
+    y1 = img_top_left[1]
+
+    x2 = img_bot_right[0]
+    y2 = img_bot_right[1]
+
+    ann_x1 = ann_top_left[0]
+    ann_y1 = ann_top_left[1]
+
+    ann_x2 = ann_bot_right[0]
+    ann_y2 = ann_bot_right[1]
+
+    # Annotation bbox center should be fully on an image.
+    ann_center = ((ann_x1 + ann_x2) / 2, (ann_y1 + ann_y2) / 2)
+
+    ann_center_x_on_image = ann_center[0] > x1 and ann_center[0] < x2
+    ann_center_y_on_image = ann_center[1] > y1 and ann_center[1] < y2
+
+    if ann_center_x_on_image and ann_center_y_on_image:
+        return True
+
+    return False
+
+
+def create_tiles_with_annotation(annotations, slide, tile_size=1024):
     """
     Generates tiles with annotations. Moves above the WSI with selected tile size
     and finds all annotations for selected region.
@@ -102,10 +138,6 @@ def create_tiles_with_annotation(
         OpenSlide object of WSI.
     tile_size : int
         Size of the generated image.
-    image_dir : str
-        Location where to store generated images if image saving is requested.
-    save_images : bool
-        Switch to enable saving annotated sections of WSI images.
     """
 
     x_dim = slide.level_dimensions[0][0]
@@ -128,16 +160,13 @@ def create_tiles_with_annotation(
             tile_anns = []
             # Check if there are annotations inside tile.
             for ann in annotations["annotations"]:
-                centres = annotations["annotations"][ann]["geometry"]["points"]
-
-                ann_in_image = False
-                for point in centres:
-                    x_p, y_p = point
-                    # Point inside tile.
-                    if x_p < x_1[0] and x_p > x_0[0] and y_p < x_1[1] and y_p > x_0[1]:
-                        ann_in_image = True
-
-                if ann_in_image:
+                points = annotations["annotations"][ann]["geometry"]["points"]
+                if ann_in_image(
+                    img_top_left=x_0,
+                    img_bot_right=x_1,
+                    ann_top_left=(points[0][0], points[0][1]),
+                    ann_bot_right=(points[1][0], points[1][1]),
+                ):
                     tile_anns.append(annotations["annotations"][ann])
 
             tile_info["top_left"] = x_0
@@ -147,23 +176,20 @@ def create_tiles_with_annotation(
 
             tile_annotations.append(tile_info)
 
-    # Save annotated images.
-    if save_images:
-        if image_dir == "":
-            image_dir = "images" + os.path.sep
-
-        if image_dir[-1] != os.path.sep:
-            image_dir = image_dir + os.path.sep
-
-        if not os.path.exists(image_dir):
-            os.mkdir(image_dir)
-
-        tiles = pd.DataFrame(tile_annotations)
-        tiles_with_annotations = tiles[tiles.annotations.str.len() > 0]
-        for _, row in tiles_with_annotations.iterrows():
-            save_annotated_image(image_dir, slide, row.top_left, row.image_size)
-
     return tile_annotations
+
+
+def save_images(annotations, data_folder, output_dir):
+    image_dir = output_dir + "data" + os.path.sep
+
+    if not os.path.exists(image_dir):
+        os.mkdir(image_dir)
+
+    tiles = pd.DataFrame(annotations)
+    tiles_with_annotations = tiles[tiles.annotations.str.len() > 0]
+    for _, row in tiles_with_annotations.iterrows():
+        slide = open_slide(data_folder + row.filename + ".mrxs")
+        save_annotated_image(image_dir, slide, row.top_left, row.image_size)
 
 
 def main(args):
@@ -172,6 +198,12 @@ def main(args):
     annotations = load_annotations(root)
     slides = load_slides(root)
 
+    if args.output_dir[-1] != os.path.sep:
+        args.output_dir = args.output_dir + os.path.sep
+
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+
     print("Generating annotations!")
     print("Data folder: {}".format(root))
     print("All slides: {}".format(mrx_files))
@@ -179,21 +211,18 @@ def main(args):
     total_annotations = []
     for slide, annotation in zip(slides, annotations):
         print("Slide: {}".format(slide._filename))
-        annotations = create_tiles_with_annotation(
-            annotation,
-            slide,
-            args.image_size,
-            save_images=args.save_images,
-            image_dir=args.image_dir,
-        )
+        annotations = create_tiles_with_annotation(annotation, slide, args.image_size)
 
         total_annotations.extend(annotations)
         show_tiles_statistics(annotations)
         print()
 
     coco = create_COCO_annotations(total_annotations)
-    with open("coco_annotations.json", "w") as f:
-        json.dump(coco, f)
+    with open(args.output_dir + "labels.json", "w") as f:
+        json.dump(coco, f, indent=2, sort_keys=True)
+
+    if args.save_images:
+        save_images(total_annotations, args.data_folder, args.output_dir)
 
 
 if __name__ == "__main__":
@@ -206,10 +235,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--image_size",
-        type=int,
-        help="Size of generated smaller image in pixels",
-        default=1024,
+        "--image_size", type=int, help="Tile size of generated images", default=1024,
     )
 
     parser.add_argument(
@@ -220,10 +246,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--image_dir",
+        "--output_dir",
         type=str,
-        default="",
-        help="Directory where to save images when save option is selected",
+        default="output/",
+        help="Directory where to save generated output",
     )
 
     args = parser.parse_args()

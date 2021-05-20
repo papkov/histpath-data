@@ -58,18 +58,28 @@ def calculate_bbox(annotation, top_left):
     ann_points = annotation["geometry"]["points"]
     x1, y1 = ann_points[0][0], ann_points[0][1]
     x2, y2 = ann_points[1][0], ann_points[1][1]
+
+    # Points might be flipped.
+    if x2 < x1:
+        x2, x1 = x1, x2
+
+    if y2 < y1:
+        y2, y1 = y1, y2
+
     # Drawing points are relative to the top left
     # as the new image top left is (0,0)
     point1 = (x1 - top_left[0], y1 - top_left[1])
     point2 = (x2 - top_left[0], y2 - top_left[1])
 
-    # Swap if points are flipped. Point1 should be upper left.
-    if point1 > point2:
-        point1, point2 = point2, point1
-
     width = point2[0] - point1[0]
     height = point2[1] - point1[1]
 
+    if width < 0 or height < 0:
+        raise ValueError(
+            "Annotation bbox width or height cant be negative!\n width:\t{}\n heigh:\t{}\n top-left:\t{}\n annotation:\t{}".format(
+                width, height, top_left, annotation
+            )
+        )
     return [point1[0], point1[1], width, height]
 
 
@@ -80,39 +90,6 @@ def get_annotation_filename(annotation):
     return "{}_{}_{}.png".format(
         annotation["filename"], annotation["top_left"][0], annotation["top_left"][1]
     )
-
-
-def ellipse_to_polygon(bbox):
-    """
-    Converts bbox around ellipse to points as polygon.
-    """
-    # Top left pixel.
-    x = bbox[0]
-    y = bbox[1]
-
-    width = bbox[2]
-    height = bbox[3]
-
-    center = ((x + width) / 2, (y + height) / 2)
-
-    # TODO: if the last point should be the same as first?
-    # Currently they are the same.
-
-    ell = Ellipse((center[0], center[1]), width, height)
-    # Polygon
-    poly = np.array(ell.get_path().to_polygons())
-    poly = poly.reshape(poly.shape[1], poly.shape[2])  # Reduce first dimension
-
-    # Scale points with width and height
-    poly = poly * [width, height]
-
-    # Convert coordinates to original image
-    poly = poly + [center[0], center[1]]
-
-    # For json serialization.
-    poly = poly.tolist()
-
-    return poly
 
 
 def create_COCO_annotations(tiles_with_annotation):
@@ -158,7 +135,7 @@ def create_COCO_annotations(tiles_with_annotation):
                 "id": ann_id,
                 "image_id": id,
                 "category_id": label_to_category_id(get_annotation_label(ann)),
-                "segmentation": poly,
+                "segmentation": [],
                 "area": get_annotation_area(ann),
                 "bbox": bbox,
                 "iscrowd": 0,
