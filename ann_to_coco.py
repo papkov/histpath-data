@@ -92,39 +92,6 @@ def get_annotation_filename(annotation):
     )
 
 
-def ellipse_to_polygon(bbox):
-    """
-    Converts bbox around ellipse to points as polygon.
-    """
-    # Top left pixel.
-    x = bbox[0]
-    y = bbox[1]
-
-    width = bbox[2]
-    height = bbox[3]
-
-    center = ((x + width) / 2, (y + height) / 2)
-
-    # TODO: if the last point should be the same as first?
-    # Currently they are the same.
-
-    ell = Ellipse((center[0], center[1]), width, height)
-    # Polygon
-    poly = np.array(ell.get_path().to_polygons())
-    poly = poly.reshape(poly.shape[1], poly.shape[2])  # Reduce first dimension
-
-    # Scale points with width and height
-    poly = poly * [width, height]
-
-    # Convert coordinates to original image
-    poly = poly + [center[0], center[1]]
-
-    # For json serialization.
-    poly = poly.tolist()
-
-    return poly
-
-
 def create_COCO_annotations(tiles_with_annotation):
     """
     Creates COCO annotation from annotated tiles.
