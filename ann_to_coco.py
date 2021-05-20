@@ -130,7 +130,6 @@ def create_COCO_annotations(tiles_with_annotation):
         prev_annotation = row.annotations
         for ann in prev_annotation:
             bbox = calculate_bbox(ann, row.top_left)
-            poly = ellipse_to_polygon(bbox)
             coco_ann = {
                 "id": ann_id,
                 "image_id": id,
