@@ -71,8 +71,6 @@ def calculate_bbox(annotation, top_left):
     point1 = (x1 - top_left[0], y1 - top_left[1])
     point2 = (x2 - top_left[0], y2 - top_left[1])
 
-    # TODO: This may need better handling as the annotation points are sometimes
-    # switched so that the first point isn't top left. Focal points? UI cursor click points?
     width = point2[0] - point1[0]
     height = point2[1] - point1[1]
 
