@@ -208,4 +208,4 @@ dependencies:
     - voxel51-eta==0.4.1
     - werkzeug==1.0.1
     - xmltodict==0.12.0
-prefix: /home/kaarel/miniconda3/envs/histpath-project
+prefix: histpath-project
