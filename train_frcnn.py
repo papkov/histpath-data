@@ -12,6 +12,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from references.engine import train_one_epoch, evaluate
 from references import utils
+from references import transforms as T
 from datetime import datetime
 
 
@@ -69,7 +70,7 @@ class torchDataset(Dataset):
         }
 
         if self.transforms is not None:
-            img = self.transforms(img)
+            img, target = self.transforms(img, target)
 
         return img, target
 
@@ -77,11 +78,12 @@ class torchDataset(Dataset):
         return len(self.ids)
 
 
-def get_transform():
-    custom_transforms = []
-    custom_transforms.append(torchvision.transforms.ToTensor())
-    custom_transforms.append(torchvision.transforms.RandomHorizontalFlip(0.5))
-    return torchvision.transforms.Compose(custom_transforms)
+def get_transform(train):
+    transforms = []
+    transforms.append(T.ToTensor())
+    if train:
+        transforms.append(T.RandomHorizontalFlip(0.5))
+    return T.Compose(transforms)
 
 
 def do_training(model, torch_dataset, torch_dataset_test, num_epochs):
@@ -113,9 +115,11 @@ def main(args):
     test_coco = "coco/annotations/instances_val2017.json"
 
     dataset = torchDataset(
-        root=train_dir, annotations=train_coco, transforms=get_transform()
+        root=train_dir, annotations=train_coco, transforms=get_transform(train=True)
     )
-    test_dataset = torchDataset(root=test_dir, annotations=test_coco)
+    test_dataset = torchDataset(
+        root=test_dir, annotations=test_coco, transforms=get_transform(train=False)
+    )
 
     num_classes = 6
     model = get_model(num_classes)
