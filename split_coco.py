@@ -89,15 +89,9 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("annotations", type=str, help="Path to COCO annotations")
+    parser.add_argument("image_dir", type=str, help="Location of annotated image")
     parser.add_argument(
-        "-s",
-        type=float,
-        dest="split",
-        required=True,
-        help="Percentage of training images",
-    )
-    parser.add_argument(
-        "-d", type=str, dest="image_dir", required=True, help="Image directory"
+        "split", type=float, help="Percentage of training images",
     )
 
     args = parser.parse_args()
