@@ -65,7 +65,7 @@ def main(args):
                     )
                 )
 
-            sample["faster_rcnn"] = fo.Detections(detections=detections)
+            sample[args.label] = fo.Detections(detections=detections)
             sample.save()
 
     print("Finished adding predictions")
@@ -82,6 +82,10 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "weights_path", type=str, help="Location of Faster-RCNN model weights",
+    )
+
+    parser.add_argument(
+        "label", type=str, help="Label for created predictions",
     )
 
     args = parser.parse_args()
