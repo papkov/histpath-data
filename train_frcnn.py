@@ -17,7 +17,7 @@ from datetime import datetime
 
 
 def get_model(num_classes):
-    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
+    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
@@ -88,10 +88,10 @@ def get_transform(train):
 
 def do_training(model, torch_dataset, torch_dataset_test, num_epochs):
     data_loader = DataLoader(
-        torch_dataset, batch_size=2, shuffle=True, collate_fn=utils.collate_fn
+        torch_dataset, batch_size=8, shuffle=True, collate_fn=utils.collate_fn
     )
     data_loader_test = DataLoader(
-        torch_dataset_test, batch_size=1, shuffle=False, collate_fn=utils.collate_fn
+        torch_dataset_test, batch_size=2, shuffle=False, collate_fn=utils.collate_fn
     )
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -131,7 +131,7 @@ def main(args):
 
     torch.save(
         model.state_dict(),
-        "models/rcnn/" + datetime.now().strftime("%d_%m_%Y_%H_%M_%S"),
+        "models/rcnn/" + datetime.now().strftime("%d_%m_%Y_%H_%M_%S") + ".pth",
     )
 
 
