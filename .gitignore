@@ -5,3 +5,5 @@ coco/annotations/*
 coco/train2017/*
 coco/val2017/*
 output/*
+models/*
+.ipynb_checkpoints
