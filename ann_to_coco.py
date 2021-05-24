@@ -45,7 +45,11 @@ def get_annotation_area(annotation):
     return annotation["stats"]["area_px"]
 
 
-def calculate_bbox(annotation, top_left):
+def clamp(val, smallest, largest):
+    return max(smallest, min(val, largest))
+
+
+def calculate_bbox(annotation, top_left, image_size):
     """
     Calculates bbox [x, y, width, height] of annotated section relative to the image.
 
@@ -68,8 +72,13 @@ def calculate_bbox(annotation, top_left):
 
     # Drawing points are relative to the top left
     # as the new image top left is (0,0)
-    point1 = (x1 - top_left[0], y1 - top_left[1])
-    point2 = (x2 - top_left[0], y2 - top_left[1])
+    point1 = [x1 - top_left[0], y1 - top_left[1]]
+    point2 = [x2 - top_left[0], y2 - top_left[1]]
+
+    # Limit points to the image border.
+    # That also limits bbox to image border.
+    point1 = [clamp(point1[0], 0, image_size), clamp(point1[1], 0, image_size)]
+    point2 = [clamp(point2[0], 0, image_size), clamp(point2[1], 0, image_size)]
 
     width = point2[0] - point1[0]
     height = point2[1] - point1[1]
@@ -129,7 +138,7 @@ def create_COCO_annotations(tiles_with_annotation):
 
         prev_annotation = row.annotations
         for ann in prev_annotation:
-            bbox = calculate_bbox(ann, row.top_left)
+            bbox = calculate_bbox(ann, row.top_left, row.image_size)
             coco_ann = {
                 "id": ann_id,
                 "image_id": id,

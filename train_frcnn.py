@@ -14,6 +14,10 @@ from references.engine import train_one_epoch, evaluate
 from references import utils
 from references import transforms as T
 from datetime import datetime
+import albumentations
+from albumentations.pytorch.transforms import ToTensorV2
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def get_model(num_classes):
@@ -50,9 +54,16 @@ class torchDataset(Dataset):
             ymin = coco_annotation[i]["bbox"][1]
             xmax = xmin + coco_annotation[i]["bbox"][2]
             ymax = ymin + coco_annotation[i]["bbox"][3]
-            boxes.append([xmin, ymin, xmax, ymax])
+            boxes.append([xmin, ymin, xmax, ymax])  # pascal_voc
             labels.append(coco_annotation[i]["category_id"])
             areas.append(coco_annotation[i]["area"])
+
+        if self.transforms is not None:
+            sample = {"image": np.array(img), "bboxes": boxes, "labels": labels}
+            sample = self.transforms(**sample)
+            img = sample["image"]
+            boxes = sample["bboxes"]
+            labels = sample["labels"]
 
         # Collect
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
@@ -69,21 +80,33 @@ class torchDataset(Dataset):
             "image_id": image_id,
         }
 
-        if self.transforms is not None:
-            img, target = self.transforms(img, target)
-
         return img, target
 
     def __len__(self):
         return len(self.ids)
 
 
-def get_transform(train):
-    transforms = []
-    transforms.append(T.ToTensor())
-    if train:
-        transforms.append(T.RandomHorizontalFlip(0.5))
-    return T.Compose(transforms)
+def get_train_transform():
+    return albumentations.Compose(
+        [
+            albumentations.Flip(),
+            albumentations.ShiftScaleRotate(),
+            albumentations.Normalize(),
+            ToTensorV2(),
+        ],
+        bbox_params=albumentations.BboxParams(
+            format="pascal_voc", label_fields=["labels"]
+        ),
+    )
+
+
+def get_test_transform():
+    return albumentations.Compose(
+        [albumentations.Normalize(), ToTensorV2()],
+        bbox_params=albumentations.BboxParams(
+            format="pascal_voc", label_fields=["labels"]
+        ),
+    )
 
 
 def do_training(model, torch_dataset, torch_dataset_test, num_epochs):
@@ -115,10 +138,10 @@ def main(args):
     test_coco = "coco/annotations/instances_val2017.json"
 
     dataset = torchDataset(
-        root=train_dir, annotations=train_coco, transforms=get_transform(train=True)
+        root=train_dir, annotations=train_coco, transforms=get_train_transform()
     )
     test_dataset = torchDataset(
-        root=test_dir, annotations=test_coco, transforms=get_transform(train=False)
+        root=test_dir, annotations=test_coco, transforms=get_test_transform()
     )
 
     num_classes = 6
