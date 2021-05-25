@@ -1,6 +1,7 @@
 .vscode
 images
 __pycache__
+coco/*
 coco/annotations/*
 coco/train2017/*
 coco/val2017/*
