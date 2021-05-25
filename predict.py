@@ -27,16 +27,8 @@ def load_fo_dataset(dir, name):
     return dataset
 
 
-def main(args):
-    dataset = load_fo_dataset(args.dataset_dir, args.name)
-    print("Dataset loaded!")
-    print(dataset)
-
+def add_predictions(dataset, label, model, device):
     classes = dataset.default_classes
-    num_classes = len(classes)
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = get_model(device, args.weights_path, num_classes)
-
     with fo.ProgressBar() as pb:
         for sample in pb(dataset):
             # Load image
@@ -65,10 +57,39 @@ def main(args):
                     )
                 )
 
-            sample[args.label] = fo.Detections(detections=detections)
+            sample[label] = fo.Detections(detections=detections)
             sample.save()
 
-    print("Finished adding predictions")
+
+def main(args):
+    dataset = load_fo_dataset(args.dataset_dir, args.name)
+    print("Dataset loaded!")
+    print(dataset)
+    generate_predictions = True
+
+    # Dont overwrite predictions if they exists with same label.
+    label_exists = dataset.has_sample_field(args.label)
+    if label_exists:
+        print("Dataset has allready predictions with label: {}".format(args.label))
+        u_input = input("Would you like to generate new predictions? (y/n) : ")
+        if str.lower(u_input) == "n":
+            print("Skipping adding predictions!")
+            generate_predictions = False
+
+    classes = dataset.default_classes
+    num_classes = len(classes)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = get_model(device, args.weights_path, num_classes)
+
+    if generate_predictions:
+        add_predictions(dataset, args.label, device, model)
+        print("Finished adding predictions")
+
+    results = fo.evaluate_detections(
+        dataset, args.label, eval_key="eval", compute_mAP=True
+    )
+    print("mAP: {}".format(results.mAP()))
+    results.print_report()
 
 
 if __name__ == "__main__":
