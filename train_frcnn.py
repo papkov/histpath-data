@@ -1,23 +1,30 @@
 import argparse
+import glob
 import math
-
-from pycocotools.coco import COCO
 import os
+from datetime import datetime
+
+import albumentations
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torchvision
-from PIL import Image
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
+from albumentations.augmentations.transforms import (
+    Flip,
+    HueSaturationValue,
+    Normalize,
+    RandomBrightnessContrast,
+)
+from albumentations.pytorch.transforms import ToTensorV2
+from numpy.core.fromnumeric import std
+from PIL import Image, ImageStat
+from pycocotools.coco import COCO
+from torch.utils.data import DataLoader, Dataset
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
-from references.engine import train_one_epoch, evaluate
-from references import utils
 from references import transforms as T
-from datetime import datetime
-import albumentations
-from albumentations.pytorch.transforms import ToTensorV2
-import numpy as np
-import matplotlib.pyplot as plt
+from references import utils
+from references.engine import evaluate, train_one_epoch
 
 
 def get_model(num_classes):
@@ -62,6 +69,8 @@ class torchDataset(Dataset):
             sample = {"image": np.array(img), "bboxes": boxes, "labels": labels}
             sample = self.transforms(**sample)
             img = sample["image"]
+            # plt.imshow(img.permute(1, 2, 0))
+            # plt.show()
             boxes = sample["bboxes"]
             labels = sample["labels"]
 
@@ -92,12 +101,15 @@ class torchDataset(Dataset):
         return len(self.ids)
 
 
-def get_train_transform():
+def get_train_transform(mean, std):
     return albumentations.Compose(
         [
-            albumentations.Flip(),
-            albumentations.ShiftScaleRotate(),
-            albumentations.Normalize(),
+            Flip(),
+            RandomBrightnessContrast(brightness_limit=0.5, contrast_limit=0.5),
+            HueSaturationValue(
+                hue_shift_limit=10, sat_shift_limit=50, val_shift_limit=50
+            ),
+            Normalize(mean=mean, std=std),
             ToTensorV2(),
         ],
         bbox_params=albumentations.BboxParams(
@@ -106,9 +118,26 @@ def get_train_transform():
     )
 
 
-def get_test_transform():
+def calc_norm_sats(img_dir):
+    mean_list = []
+    std_list = []
+    for img_p in glob.glob(img_dir + "/*.png"):
+        img = Image.open(img_p)
+        stats = ImageStat.Stat(img)
+        mean = np.array(stats.mean) / 255
+        std = np.array(stats.stddev) / 255
+        mean_list.append(mean)
+        std_list.append(std)
+
+    means = np.array(mean_list).mean(axis=0)
+    stds = np.array(std_list).mean(axis=0)
+
+    return means, stds
+
+
+def get_test_transform(mean, std):
     return albumentations.Compose(
-        [albumentations.Normalize(), ToTensorV2()],
+        [Normalize(mean=mean, std=std), ToTensorV2()],
         bbox_params=albumentations.BboxParams(
             format="pascal_voc", label_fields=["labels"]
         ),
@@ -143,11 +172,19 @@ def main(args):
     test_dir = "coco/val2017"
     test_coco = "coco/annotations/instances_val2017.json"
 
+    print("Calculating mean and std for training and testing images!")
+    train_mean, train_std = calc_norm_sats(train_dir)
+    test_mean, tests_std = calc_norm_sats(test_dir)
+
     dataset = torchDataset(
-        root=train_dir, annotations=train_coco, transforms=get_train_transform()
+        root=train_dir,
+        annotations=train_coco,
+        transforms=get_train_transform(train_mean, train_std),
     )
     test_dataset = torchDataset(
-        root=test_dir, annotations=test_coco, transforms=get_test_transform()
+        root=test_dir,
+        annotations=test_coco,
+        transforms=get_test_transform(test_mean, tests_std),
     )
 
     num_classes = 6
