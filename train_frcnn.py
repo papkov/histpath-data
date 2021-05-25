@@ -65,6 +65,12 @@ class torchDataset(Dataset):
             boxes = sample["bboxes"]
             labels = sample["labels"]
 
+        # If there are no more bboxes left after augmentation.
+        if len(boxes) == 0:
+            boxes = np.array([[0.0, 0.0, 1.0, 1.0]])
+            areas = [1.0]
+            labels = [0]
+
         # Collect
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         labels = torch.as_tensor(labels, dtype=torch.int64)
