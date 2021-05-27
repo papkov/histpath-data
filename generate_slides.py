@@ -6,7 +6,7 @@ import os
 import pandas as pd
 from openslide import OpenSlide, open_slide
 
-from ann_to_coco import create_COCO_annotations
+from references.ann_to_coco import create_COCO_annotations
 
 
 def load_mrxs_files(data_dir):
@@ -217,11 +217,13 @@ def main(args):
         show_tiles_statistics(annotations)
         print()
 
+    print("Saving labels!")
     coco = create_COCO_annotations(total_annotations)
     with open(args.output_dir + "labels.json", "w") as f:
         json.dump(coco, f, indent=2, sort_keys=True)
 
     if args.save_images:
+        print("Saving images!")
         save_images(total_annotations, args.data_folder, args.output_dir)
 
 
@@ -241,7 +243,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_images",
         type=bool,
-        default=False,
+        default=True,
         help="Create images from annotated slides",
     )
 

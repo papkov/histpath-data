@@ -8,11 +8,11 @@ from sklearn.model_selection import train_test_split
 # https://github.com/akarazniewicz/cocosplit/blob/master/cocosplit.py
 
 
-def save_coco(file, info, licences, images, annotations, categories):
+def save_coco(file_path, info, licences, images, annotations, categories):
     """
     Save COCO annotations to a file.
     """
-    with open("coco/annotations/{}".format(file), "w") as coco:
+    with open(file_path, "w") as coco:
         json.dump(
             {
                 "info": info,
@@ -37,11 +37,12 @@ def filter_annotations(annotations, images):
 
 def main(args):
     # Create dirs if not exist.
-    if not os.path.isdir("coco"):
-        os.mkdir("coco")
-        os.mkdir("coco/annotations")
-        os.mkdir("coco/train2017")
-        os.mkdir("coco/val2017")
+    if not os.path.isdir(args.save_dir):
+        os.mkdir(args.save_dir)
+        os.mkdir(os.path.join(args.save_dir, "train"))
+        os.mkdir(os.path.join(args.save_dir, "train", "data"))
+        os.mkdir(os.path.join(args.save_dir, "test"))
+        os.mkdir(os.path.join(args.save_dir, "test", "data"))
 
     with open(args.annotations, "rt") as annotations:
         coco = json.load(annotations)
@@ -52,8 +53,10 @@ def main(args):
         categories = coco["categories"]
 
         x, y = train_test_split(images, train_size=args.split)
+        train_file = os.path.join(args.save_dir, "train") + os.path.sep + "labels.json"
+        test_file = os.path.join(args.save_dir, "test") + os.path.sep + "labels.json"
         save_coco(
-            "instances_train2017.json",
+            train_file,
             info,
             licenses,
             x,
@@ -61,7 +64,7 @@ def main(args):
             categories,
         )
         save_coco(
-            "instances_val2017.json",
+            test_file,
             info,
             licenses,
             y,
@@ -72,14 +75,18 @@ def main(args):
         print("Saved {} training entries and {} test entries".format(len(x), len(y)))
 
     # Move images.
+    # Training.
+    new_train_img_dir = os.path.join(args.save_dir, "train", "data") + os.path.sep
     for im in x:
         org_path = args.image_dir + im["file_name"]
-        new_path = "coco/train2017/" + im["file_name"]
+        new_path = new_train_img_dir + im["file_name"]
         os.rename(org_path, new_path)
 
+    # Testing.
+    new_test_img_dir = os.path.join(args.save_dir, "test", "data") + os.path.sep
     for im in y:
         org_path = args.image_dir + im["file_name"]
-        new_path = "coco/val2017/" + im["file_name"]
+        new_path = new_test_img_dir + im["file_name"]
         os.rename(org_path, new_path)
 
 
@@ -88,10 +95,26 @@ if __name__ == "__main__":
         description="COCO dataset train test split for CenterNet-better"
     )
 
-    parser.add_argument("annotations", type=str, help="Path to COCO annotations")
-    parser.add_argument("image_dir", type=str, help="Location of annotated image")
     parser.add_argument(
-        "split", type=float, help="Percentage of training images",
+        "--annotations",
+        type=str,
+        help="Path to COCO annotations",
+        default="output/labels.json",
+    )
+    parser.add_argument(
+        "--image_dir",
+        type=str,
+        help="Location of annotated image",
+        default="output/data/",
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        help="Location where to save train/test datasets",
+        default="coco/",
+    )
+    parser.add_argument(
+        "--split", type=float, help="Percentage of training images", default=0.8
     )
 
     args = parser.parse_args()
