@@ -6,6 +6,7 @@ import torchvision
 from PIL import Image
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.transforms import functional as F
+from torchvision.ops import nms
 
 
 def get_model(device, weights_path, num_classes):
@@ -27,7 +28,7 @@ def load_fo_dataset(dir, name):
     return dataset
 
 
-def add_predictions(dataset, label, model, device):
+def add_predictions(dataset, sample_label, device, model):
     classes = dataset.default_classes
     with fo.ProgressBar() as pb:
         for sample in pb(dataset):
@@ -37,9 +38,17 @@ def add_predictions(dataset, label, model, device):
             c, h, w = image.shape
 
             preds = model([image])[0]
-            labels = preds["labels"].cpu().detach().numpy()
-            scores = preds["scores"].cpu().detach().numpy()
-            boxes = preds["boxes"].cpu().detach().numpy()
+
+            # Non-Max suppression.
+            # Indices to keep.
+            idx = nms(boxes=preds["boxes"], scores=preds["scores"], iou_threshold=0.1)
+            boxes = preds["boxes"][idx]
+            labels = preds["labels"][idx]
+            scores = preds["scores"][idx]
+
+            labels = labels.cpu().detach().numpy()
+            scores = scores.cpu().detach().numpy()
+            boxes = boxes.cpu().detach().numpy()
 
             detections = []
             for label, score, box in zip(labels, scores, boxes):
@@ -57,7 +66,7 @@ def add_predictions(dataset, label, model, device):
                     )
                 )
 
-            sample[label] = fo.Detections(detections=detections)
+            sample[sample_label] = fo.Detections(detections=detections)
             sample.save()
 
 
@@ -85,9 +94,7 @@ def main(args):
         add_predictions(dataset, args.label, device, model)
         print("Finished adding predictions")
 
-    results = fo.evaluate_detections(
-        dataset, args.label, eval_key="eval", compute_mAP=True
-    )
+    results = fo.evaluate_detections(dataset, args.label, compute_mAP=True)
     print("mAP: {}".format(results.mAP()))
     results.print_report()
 
