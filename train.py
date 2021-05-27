@@ -178,6 +178,7 @@ def main(args):
     train_mean, train_std = calc_norm_sats(train_dir)
     test_mean, tests_std = calc_norm_sats(test_dir)
 
+    print("Collecting datasets.")
     dataset = torchDataset(
         root=train_dir,
         annotations=train_coco,
@@ -191,16 +192,23 @@ def main(args):
 
     num_classes = 6
     model = get_model(num_classes, args.pretrained_model)
-
+    print("Starting training with {} classes".format(num_classes))
     do_training(model, dataset, test_dataset, args.epochs)
 
-    if not os.path.isdir("models/rcnn"):
-        os.mkdir("models/rcnn")
+    print("Finished!")
+    print("Saving model weights!")
+    if not os.path.isdir("models"):
+        os.mkdir("models")
 
-    torch.save(
-        model.state_dict(),
-        "models/rcnn/" + datetime.now().strftime("%d_%m_%Y_%H_%M_%S") + ".pth",
-    )
+    if args.model_name:
+        torch.save(
+            model.state_dict(), "models/" + args.model_name + ".pth",
+        )
+    else:
+        torch.save(
+            model.state_dict(),
+            "models/" + datetime.now().strftime("%d_%m_%Y_%H_%M_%S") + ".pth",
+        )
 
 
 if __name__ == "__main__":
@@ -214,6 +222,13 @@ if __name__ == "__main__":
         type=bool,
         help="Use pretrained model weights for training",
         default=True,
+    )
+
+    parser.add_argument(
+        "--model_name",
+        type=str,
+        help="Name for the weights file saved after training",
+        default="",
     )
 
     args = parser.parse_args()
