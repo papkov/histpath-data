@@ -8,3 +8,4 @@ coco/val2017/*
 output/*
 models/*
 .ipynb_checkpoints
+samples
