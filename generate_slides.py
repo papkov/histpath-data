@@ -241,7 +241,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_images",
         type=bool,
-        default=False,
+        default=True,
         help="Create images from annotated slides",
     )
 
