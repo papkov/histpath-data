@@ -27,8 +27,10 @@ from references import utils
 from references.engine import evaluate, train_one_epoch
 
 
-def get_model(num_classes):
-    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+def get_model(num_classes, pretrained_model=True):
+    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
+        pretrained=pretrained_model
+    )
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
@@ -167,10 +169,10 @@ def do_training(model, torch_dataset, torch_dataset_test, num_epochs):
 
 
 def main(args):
-    train_dir = "coco/train2017"
-    train_coco = "coco/annotations/instances_train2017.json"
-    test_dir = "coco/val2017"
-    test_coco = "coco/annotations/instances_val2017.json"
+    train_dir = "coco/train/data"
+    train_coco = "coco/train/labels.json"
+    test_dir = "coco/test/data"
+    test_coco = "coco/test/labels.json"
 
     print("Calculating mean and std for training and testing images!")
     train_mean, train_std = calc_norm_sats(train_dir)
@@ -188,7 +190,7 @@ def main(args):
     )
 
     num_classes = 6
-    model = get_model(num_classes)
+    model = get_model(num_classes, args.pretrained_model)
 
     do_training(model, dataset, test_dataset, args.epochs)
 
@@ -206,6 +208,12 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "-e", type=int, dest="epochs", default=1, help="Number of epochs to train",
+    )
+    parser.add_argument(
+        "--pretrained_model",
+        type=bool,
+        help="Use pretrained model weights for training",
+        default=True,
     )
 
     args = parser.parse_args()
