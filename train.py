@@ -10,10 +10,10 @@ import numpy as np
 import torch
 import torchvision
 from albumentations.augmentations.transforms import (
-    Flip,
-    HueSaturationValue,
     CLAHE,
     FancyPCA,
+    Flip,
+    HueSaturationValue,
     RandomBrightnessContrast,
     ToFloat,
 )
@@ -22,6 +22,7 @@ from numpy.core.fromnumeric import mean, std
 from PIL import Image, ImageStat
 from pycocotools.coco import COCO
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.tensorboard import SummaryWriter
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from references import transforms as T
@@ -126,7 +127,7 @@ def get_test_transform():
     )
 
 
-def do_training(model, torch_dataset, torch_dataset_test, num_epochs):
+def do_training(model, torch_dataset, torch_dataset_test, num_epochs, writer):
     data_loader = DataLoader(
         torch_dataset, batch_size=8, shuffle=True, collate_fn=utils.collate_fn
     )
@@ -143,8 +144,15 @@ def do_training(model, torch_dataset, torch_dataset_test, num_epochs):
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     for epoch in range(num_epochs):
-        train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10)
+        log = train_one_epoch(
+            model, optimizer, data_loader, device, epoch, print_freq=10
+        )
+
+        writer.add_scalar("Train/Learning rate", log.meters["lr"].value, epoch)
+        writer.add_scalar("Train/Loss", log.meters["loss"].value, epoch)
+
         lr_scheduler.step()
+
         evaluate(model, data_loader_test, device)
 
 
@@ -163,9 +171,12 @@ def main(args):
     )
 
     num_classes = 6
+    writer = SummaryWriter()
     model = get_model(num_classes, args.pretrained_model)
     print("Starting training with {} classes".format(num_classes))
-    do_training(model, dataset, test_dataset, args.epochs)
+    do_training(model, dataset, test_dataset, args.epochs, writer)
+    writer.flush()
+    writer.close()
 
     print("Finished!")
     print("Saving model weights!")
