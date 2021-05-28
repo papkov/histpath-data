@@ -4,7 +4,7 @@ import math
 import os
 from datetime import datetime
 
-import albumentations
+import albumentations as A
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -12,11 +12,13 @@ import torchvision
 from albumentations.augmentations.transforms import (
     Flip,
     HueSaturationValue,
-    Normalize,
+    CLAHE,
+    FancyPCA,
     RandomBrightnessContrast,
+    ToFloat,
 )
 from albumentations.pytorch.transforms import ToTensorV2
-from numpy.core.fromnumeric import std
+from numpy.core.fromnumeric import mean, std
 from PIL import Image, ImageStat
 from pycocotools.coco import COCO
 from torch.utils.data import DataLoader, Dataset
@@ -71,8 +73,6 @@ class torchDataset(Dataset):
             sample = {"image": np.array(img), "bboxes": boxes, "labels": labels}
             sample = self.transforms(**sample)
             img = sample["image"]
-            # plt.imshow(img.permute(1, 2, 0))
-            # plt.show()
             boxes = sample["bboxes"]
             labels = sample["labels"]
 
@@ -103,46 +103,26 @@ class torchDataset(Dataset):
         return len(self.ids)
 
 
-def get_train_transform(mean, std):
-    return albumentations.Compose(
+def get_train_transform():
+    return A.Compose(
         [
             Flip(),
-            RandomBrightnessContrast(brightness_limit=0.5, contrast_limit=0.5),
+            RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2),
+            A.OneOf([CLAHE(), FancyPCA()]),
             HueSaturationValue(
-                hue_shift_limit=10, sat_shift_limit=50, val_shift_limit=50
+                hue_shift_limit=10, sat_shift_limit=50, val_shift_limit=50, p=0.8
             ),
-            Normalize(mean=mean, std=std),
+            ToFloat(255),
             ToTensorV2(),
         ],
-        bbox_params=albumentations.BboxParams(
-            format="pascal_voc", label_fields=["labels"]
-        ),
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
 
 
-def calc_norm_sats(img_dir):
-    mean_list = []
-    std_list = []
-    for img_p in glob.glob(img_dir + "/*.png"):
-        img = Image.open(img_p)
-        stats = ImageStat.Stat(img)
-        mean = np.array(stats.mean) / 255
-        std = np.array(stats.stddev) / 255
-        mean_list.append(mean)
-        std_list.append(std)
-
-    means = np.array(mean_list).mean(axis=0)
-    stds = np.array(std_list).mean(axis=0)
-
-    return means, stds
-
-
-def get_test_transform(mean, std):
-    return albumentations.Compose(
-        [Normalize(mean=mean, std=std), ToTensorV2()],
-        bbox_params=albumentations.BboxParams(
-            format="pascal_voc", label_fields=["labels"]
-        ),
+def get_test_transform():
+    return A.Compose(
+        [ToFloat(255), ToTensorV2()],
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
 
 
@@ -174,20 +154,12 @@ def main(args):
     test_dir = "coco/test/data"
     test_coco = "coco/test/labels.json"
 
-    print("Calculating mean and std for training and testing images!")
-    train_mean, train_std = calc_norm_sats(train_dir)
-    test_mean, tests_std = calc_norm_sats(test_dir)
-
     print("Collecting datasets.")
     dataset = torchDataset(
-        root=train_dir,
-        annotations=train_coco,
-        transforms=get_train_transform(train_mean, train_std),
+        root=train_dir, annotations=train_coco, transforms=get_train_transform(),
     )
     test_dataset = torchDataset(
-        root=test_dir,
-        annotations=test_coco,
-        transforms=get_test_transform(test_mean, tests_std),
+        root=test_dir, annotations=test_coco, transforms=get_test_transform(),
     )
 
     num_classes = 6
