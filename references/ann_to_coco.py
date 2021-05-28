@@ -81,12 +81,12 @@ def calculate_bbox(annotation, top_left, image_size, downsample):
     # Limit points to the image border.
     # That also limits bbox to image border.
     point1 = [
-        clamp(point1[0], 0, image_size * downsample),
-        clamp(point1[1], 0, image_size * downsample),
+        clamp(point1[0], 0, image_size),
+        clamp(point1[1], 0, image_size),
     ]
     point2 = [
-        clamp(point2[0], 0, image_size * downsample),
-        clamp(point2[1], 0, image_size * downsample),
+        clamp(point2[0], 0, image_size),
+        clamp(point2[1], 0, image_size),
     ]
 
     width = point2[0] - point1[0]
