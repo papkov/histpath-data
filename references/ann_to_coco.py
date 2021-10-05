@@ -49,7 +49,7 @@ def clamp(val, smallest, largest):
     return max(smallest, min(val, largest))
 
 
-def calculate_bbox(annotation, top_left, image_size):
+def calculate_bbox(annotation, top_left, image_size, downsample):
     """
     Calculates bbox [x, y, width, height] of annotated section relative to the image.
 
@@ -70,15 +70,24 @@ def calculate_bbox(annotation, top_left, image_size):
     if y2 < y1:
         y2, y1 = y1, y2
 
+    x1, y1 = x1 // downsample, y1 // downsample
+    x2, y2 = x2 // downsample, y2 // downsample
+
     # Drawing points are relative to the top left
     # as the new image top left is (0,0)
-    point1 = [x1 - top_left[0], y1 - top_left[1]]
-    point2 = [x2 - top_left[0], y2 - top_left[1]]
+    point1 = [x1 - top_left[0] // downsample, y1 - top_left[1] // downsample]
+    point2 = [x2 - top_left[0] // downsample, y2 - top_left[1] // downsample]
 
     # Limit points to the image border.
     # That also limits bbox to image border.
-    point1 = [clamp(point1[0], 0, image_size), clamp(point1[1], 0, image_size)]
-    point2 = [clamp(point2[0], 0, image_size), clamp(point2[1], 0, image_size)]
+    point1 = [
+        clamp(point1[0], 0, image_size),
+        clamp(point1[1], 0, image_size),
+    ]
+    point2 = [
+        clamp(point2[0], 0, image_size),
+        clamp(point2[1], 0, image_size),
+    ]
 
     width = point2[0] - point1[0]
     height = point2[1] - point1[1]
@@ -96,8 +105,11 @@ def get_annotation_filename(annotation):
     """
     Returns filename of the image where annotation is made.
     """
-    return "{}_{}_{}.png".format(
-        annotation["filename"], annotation["top_left"][0], annotation["top_left"][1]
+    return "{}_lvl{}_{}_{}.png".format(
+        annotation["filename"],
+        annotation["lvl"],
+        annotation["top_left"][0],
+        annotation["top_left"][1],
     )
 
 
@@ -122,9 +134,7 @@ def create_COCO_annotations(tiles_with_annotation):
     coco["annotations"] = []
 
     ann_id = 0
-    # Iterating trough only annotated images.
-    tiles_with_annotations = df[df.annotations.str.len() > 0]
-    for id, row in tiles_with_annotations.iterrows():
+    for id, row in df.iterrows():
         im = {
             "license": 0,
             "file_name": get_annotation_filename(row),
@@ -138,7 +148,7 @@ def create_COCO_annotations(tiles_with_annotation):
 
         prev_annotation = row.annotations
         for ann in prev_annotation:
-            bbox = calculate_bbox(ann, row.top_left, row.image_size)
+            bbox = calculate_bbox(ann, row.top_left, row.image_size, row.downsample)
             coco_ann = {
                 "id": ann_id,
                 "image_id": id,
